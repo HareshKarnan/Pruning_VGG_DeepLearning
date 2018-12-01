@@ -23,7 +23,8 @@ conv_layers = ['block1_conv1','block1_conv2','block2_conv1',
                'block2_conv2','block3_conv1','block3_conv2',
                'block3_conv3','block3_conv4','block4_conv1',
                'block4_conv2','block4_conv3','block4_conv4',
-               'block5_conv1','block5_conv2','block5_conv3','block5_conv4',]
+               'block5_conv1','block5_conv2','block5_conv3','block5_conv4'] # list of all conv layers in the VGG19 model
+conv_layers.reverse()
 datagen = ImageDataGenerator(
     featurewise_center=True,
     featurewise_std_normalization=True,
@@ -51,7 +52,8 @@ def takeSecond(elem):
     return elem[1]
 
 if __name__== "__main__":
-
+    params = []
+    accuracy_list = []
     # load data
     (x_train, y_train), (x_test, y_test) = cifar10.load_data()
 
@@ -84,11 +86,13 @@ if __name__== "__main__":
 
     # find the initial validation accuracy of the model before pruning
     acc = model.evaluate_generator(datagen.flow(x_train, y_train,subset='validation'),steps=10,verbose=0)[1]
+    print('initial accuracy of the model is :: ',acc)
     acc_pruned = acc
     # find the initial number of params before pruning
     initial_params = model.count_params()
     conv_index = 0 # index of which conv_layer the surgeon is working on. Start from 0th conv layer
-    while(acc-acc_pruned<.05): # 5 percent loss is tolerable
+    while 1:
+        print('layer name :: ',conv_layers[conv_index])
         W = model.get_layer(conv_layers[conv_index]).get_weights()[0]
         # print(W.shape)
         ratio_list = []
@@ -105,30 +109,41 @@ if __name__== "__main__":
         print(len(ratio_list))
 
         surgeon = Surgeon(model)
-        channels_to_prune = [ratio_list[0][0],ratio_list[1][0],ratio_list[2][0]] # keep pruning 3 filters everytime
+        number_of_channels_to_prune_at_once = 1+int(len(ratio_list)*0.05) # remove 5% of the channels at once
+        channels_to_prune = []
+        for z in range(number_of_channels_to_prune_at_once):
+            channels_to_prune.append(ratio_list[z][0])
         surgeon.add_job('delete_channels', model.get_layer(conv_layers[conv_index]), channels=channels_to_prune)
         model = surgeon.operate()
 
         print('% of parameters now :: ',model.count_params()/initial_params)
         # train for 1 epochs
         print("Training the pruned model...")
+        for layer in model.layers:
+            layer.trainable = True # unfreeze all the layers
         model=train(model,1)
         print("Trained the pruned model...")
 
         # find validation accuracy of the pruned model
         acc_pruned = model.evaluate_generator(datagen.flow(x_train, y_train,subset='validation'),steps=10,verbose=0)[1]
+        # used for plotting later
+        accuracy_list.append(acc_pruned)
+        params.append(model.count_params() / initial_params)
+
         print('accuracy of the pruned model :: ',acc_pruned)
         print('accuracy has dropped by :: ',acc-acc_pruned)
 
         if conv_index==len(conv_layers)-1:
             print("reached the last layer of pruning")
             break
-        if(acc-acc_pruned<0.05):
+        if(acc-acc_pruned>0.05): # 5 percent loss is tolerable, but otherwise move to the next conv layer
+            print('not pruning the current layer ! accuracy will drop !')
             print('pruned all filters in layer :: '+str(conv_index)+'. Moving to the next layer to the right')
             conv_index=conv_index+1
-
-        model.save('my_model_pruned_valacc_'+str(acc_pruned)+'.h5')
-        print('saved the model ... ')
+            model = load_model('my_model_pruned.h5') #restore the previous best model
+        if (acc - acc_pruned < 0.05):
+            model.save('my_model_pruned.h5')
+            print('saved the model ... ')
 
 
 
