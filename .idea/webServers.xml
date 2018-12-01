@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="aeab7f45-adf6-4d28-87c0-ee1f9aad5fbe" name="amazon" url="http://ec2-54-227-190-57.compute-1.amazonaws.com">
+        <fileTransfer host="ec2-54-227-190-57.compute-1.amazonaws.com" port="22" privateKey="C:\Users\hares\Documents\haresh_hp.pem" accessType="SFTP" keyPair="true">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" />
+          </advancedOptions>
+          <option name="port" value="22" />
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>
